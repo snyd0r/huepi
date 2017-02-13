@@ -40,11 +40,15 @@ function main {
       #iPhone7 visible via BT
       echo "-!- huepi: iPhone is visible" | logger
       writePresenceFile "iphone7"
+    else
+      removePresenceFile "iphone7"
     fi
     if [[ "$IsS7EdgeAtHome" = 0 ]]; then
       # s7Edge visible via ping
       echo "-!- huepi: edge7 is visible" | logger
       writePresenceFile "s7edge"
+    else
+      removePresenceFile "s7edge"
     fi
     showtime
   fi
