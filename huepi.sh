@@ -32,12 +32,12 @@ function main {
     if [ "$IsIphoneAtHome" = 0 ]; then
       #iPhone7 visible via BT
       echo "iPhone is visible" | logger
-      writePresenceFile("iphone7")
+      writePresenceFile "iphone7"
     fi
     if [[ "$IsS7EdgeAtHome" = 0 ]]; then
       # s7Edge visible via ping
       echo "edge7 is visible" | logger
-      writePresenceFile("s7edge")
+      writePresenceFile "s7edge"
     fi
     # else #Phones not visible via BT or Ping
     #   echo "no is not at home" | logger
@@ -67,10 +67,10 @@ function showtime() {
   case "$PHONECOUNT" in
 
     1)  echo "iPhone is here." | logger
-    turnOnLight("arriving")
+    turnOnLight "arriving"
     ;;
     2)  echo  "s7edge is here" | logger
-    turnOnLight("arriving")
+    turnOnLight "arriving"
     ;;
     3)  echo  "iPhone and s7edge are here" | logger
     echo "We don't want to change activated light settings. Otherwise somebody may get mad ;)" | logger
