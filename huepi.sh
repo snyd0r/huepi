@@ -15,55 +15,112 @@ FOSAT="143"
 
 # Section to define how to check presence of the phones
 # iPhonemarker => BluetoothMac
-IPHONE7BTMAC='70:70:0D:98:A6:9C'
-PRESENCEFILEIPHONE7="/tmp/presenceiphone7"
+IDENTIFIER_IPHONE7='70:70:0D:98:A6:9C'
+PRESENCEFILE_IPHONE7="/tmp/presence_iphone7"
 # S7-Marker => IP Address (Lease is two Weeks)
-S7IP='192.168.77.49'
+IDENTIFIER_S7EDGE='192.168.77.49'
+PRESENCEFILE_S7EDGE="/tmp/presence_s7edge"
 
-function main {
+function main { # This function checks if phones are around.
 while :
 do
-  IsMyiPhoneAtHome=`sudo l2ping -s 1 -c 1 $IPHONE7BTMAC >/dev/null 2>&1; echo $?` #Check if iPhone is reachable
-  if [ "$IsMyiPhoneAtHome" = 0 ];
-  then #Phone visible via BT
-  echo "iPhone is visible"
-  turnOnLightWhenArriving
-else #Phone not visible via BT
-  echo "iPhone is not at home"
-  turnOffLightsWhenLeaving
-fi
-sleep 5s
+  IsIphoneAtHome=`sudo l2ping -s 1 -c 1 $IDENTIFIER_IPHONE7 >/dev/null 2>&1; echo $?` #Check if iPhone is reachable
+  IsS7EdgeAtHome=`sudo ping -c 1 -W 3 $IDENTIFIER_S7EDGE >/dev/null 2>&1; echo $?` #Check if s7edge is reachable
+  if [ "$IsIphoneAtHome" = 0 ]; then
+    #iPhone7 visible via BT
+    echo "iPhone is visible" | logger
+    writePresenceFile("iphone7")
+  fi
+  if [[ "$IsS7EdgeAtHome" = 0 ]]; then
+    # s7Edge visible via ping
+    echo "edge7 is visible" | logger
+    writePresenceFile("s7edge")
+  fi
+  # else #Phones not visible via BT or Ping
+  #   echo "no is not at home" | logger
+  #   turnOffLightsWhenLeaving
+  # fi
+  showtime
+  sleep 5s # raise to 15 or 30 in production
 done
 }
 
+function showtime() {
+  # Check for presence Files and determine what to do with the lights
+  PHONECOUNT=0
+  # We're determining what to do by quickly calculate the Values of the phones
+  # iphone7  = 1
+  # s7edge   = 2
+  # no_phone = 0
+
+  if [[ -f $PRESENCEFILE_IPHONE7 ]]; then
+    $PHONECOUNT +=1
+  fi
+
+  if [[ -f $PRESENCEFILE_S7EDGE ]]; then
+    $PHONECOUNT +=2
+  fi
+
+  case "$PHONECOUNT" in
+
+    1)  echo "iPhone is here." | logger
+    turnOnLight("arriving")
+    ;;
+    2)  echo  "s7edge is here" | logger
+    turnOnLight("arriving")
+    ;;
+    3)  echo  "iPhone and s7edge are here" | logger
+    echo "We don't want to change activated light settings. Otherwise somebody may get mad ;)" | logger
+    ;;
+    0) echo  "No phones around" | logger
+    kill -SIGKILL $2
+    ;;
+  esac
+
+}
+
 # Declare used functions
-function turnOnLightWhenArriving {
+function turnOnLight() {
+  if [[ "$1" == "arriving" ]]; then
+    #statements
   $HUEBIN transit 2,10 5 --hue $HUE --bri $BRI --sat $SAT --on # Turn on original Hue Lights (Bulbs, Strips)
   $HUEBIN transit 5,9 5 --hue $FOHUE --bri $FOBRI --sat $FOSAT --on # Turn on Friends of Hue lights (Iris, Bloom)
+  fi
 }
 
 function turnOffLightsWhenLeaving {
   # If Phones are leaving, turn off the lights
   sleep 60 # Maybe the phones are not away? Maybe they reconnect?
-  # hue transit all 5 --off
-  $HUEBIN transit 10 5 --off
+  $HUEBIN transit all 5 --off
 }
 
-function checkIfLightsAreOn {
-  # Check if any of the lights in "Wohnzimmer" are activated.
-  IsThereLight=`hue get 2,3,5,9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
-  if [[ "$IsThereLight" = 0 ]]; then # 0 = There is light, 1 = there is no light
-  # Lights are allready on
-  echo "Lights are on"
-else
-  # Turn on lights
-  turnOnLightWhenArriving
-fi
+# function checkIfLightsAreOn {
+#   # Check if any of the lights in "Wohnzimmer" are activated.
+#   IsThereLight=`hue get 2,3,5,9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
+#   if [[ "$IsThereLight" = 0 ]]; then # 0 = There is light, 1 = there is no light
+#   # Lights are allready on
+#   echo "Lights are on"
+# else
+#   # Turn on lights
+#   turnOnLightWhenArriving
+# fi
 }
 
-# function writePresenceFile
+function writePresenceFile() {
+  if [[  $0 == 'iphone7' ]]; then
+    touch $PRESENCEFILE_IPHONE7
+  elif [[  $0 == 's7edge' ]]; then
+    touch $PRESENCEFILE_S7EDGE
+  fi
+}
 
-# function isSomebodyhere
+function removePresenceFile() {
+  if [[  $0 == 'iphone7' ]]; then
+    rm $PRESENCEFILE_IPHONE7
+  elif [[  $0 == 's7edge' ]]; then
+    rm $PRESENCEFILE_S7EDGE
+  fi
+}
 
 # TODO Check if it is dark and if lights are needed
 # Maybe with some calculation and sunset- / sundown-times.
