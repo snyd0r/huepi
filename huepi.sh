@@ -31,16 +31,16 @@ function main {
     IsS7EdgeAtHome=`sudo ping -c 1 -W 3 $IDENTIFIER_S7EDGE >/dev/null 2>&1; echo $?` #Check if s7edge is reachable
     if [ "$IsIphoneAtHome" = 0 ]; then
       #iPhone7 visible via BT
-      echo "iPhone is visible" | logger
+      echo "huepi: iPhone is visible" | logger
       writePresenceFile "iphone7"
     fi
     if [[ "$IsS7EdgeAtHome" = 0 ]]; then
       # s7Edge visible via ping
-      echo "edge7 is visible" | logger
+      echo "huepi: edge7 is visible" | logger
       writePresenceFile "s7edge"
     fi
     # else #Phones not visible via BT or Ping
-    #   echo "no is not at home" | logger
+    #   echo "huepi: no is not at home" | logger
     #   turnOffLightsWhenLeaving
     # fi
     showtime
@@ -57,30 +57,31 @@ function showtime() {
   # no_phone = 0
 
   if [[ -f $PRESENCEFILE_IPHONE7 ]]; then
-    $PHONECOUNT +=1
+    (($PHONECOUNT+=1))
   fi
 
   if [[ -f $PRESENCEFILE_S7EDGE ]]; then
-    $PHONECOUNT +=2
+    (($PHONECOUNT+=2))
   fi
 
   case "$PHONECOUNT" in
 
-    1)  echo "iPhone is here." | logger
+    1)  echo "huepi: iPhone is here." | logger
     turnOnLight "arriving"
     ;;
     2)  echo  "s7edge is here" | logger
     turnOnLight "arriving"
     ;;
     3)  echo  "iPhone and s7edge are here" | logger
-    echo "We don't want to change activated light settings. Otherwise somebody may get mad ;)" | logger
+    echo "huepi: We don't want to change activated light settings. Otherwise somebody may get mad ;)" | logger
     ;;
     0) echo  "No phones around" | logger
-    echo "Grace Time before turn off." | logger
+    echo "huepi: Grace Time before turn off." | logger
     if [[ $TURN_OFF_COUNT = 3 ]]; then
-      echo "Turn off lights" | logger
+      echo "huepi: Turn off lights" | logger
       turnOffLightsWhenLeaving
     fi
+    ((TURN_OFF_COUNT+=1))
     ;;
   esac
 
@@ -105,7 +106,7 @@ function turnOffLightsWhenLeaving {
 #   IsThereLight=`hue get 2,3,5,9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
 #   if [[ "$IsThereLight" = 0 ]]; then # 0 = There is light, 1 = there is no light
 #   # Lights are allready on
-#   echo "Lights are on"
+#   echo "huepi: Lights are on"
 # else
 #   # Turn on lights
 #   turnOnLightWhenArriving
@@ -113,17 +114,17 @@ function turnOffLightsWhenLeaving {
 #}
 
 function writePresenceFile() {
-  if [[  $0 == 'iphone7' ]]; then
+  if [[  $1 == "iphone7" ]]; then
     touch $PRESENCEFILE_IPHONE7
-  elif [[  $0 == 's7edge' ]]; then
+  elif [[  $1 == "s7edge" ]]; then
     touch $PRESENCEFILE_S7EDGE
   fi
 }
 
 function removePresenceFile() {
-  if [[  $0 == 'iphone7' ]]; then
+  if [[  $1 == "iphone7" ]]; then
     rm $PRESENCEFILE_IPHONE7
-  elif [[  $0 == 's7edge' ]]; then
+  elif [[  $1 == "s7edge" ]]; then
     rm $PRESENCEFILE_S7EDGE
   fi
 }
