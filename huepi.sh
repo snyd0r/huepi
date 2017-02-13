@@ -21,28 +21,31 @@ PRESENCEFILE_IPHONE7="/tmp/presence_iphone7"
 IDENTIFIER_S7EDGE='192.168.77.49'
 PRESENCEFILE_S7EDGE="/tmp/presence_s7edge"
 
-function main { # This function checks if phones are around.
-while :
-do
-  IsIphoneAtHome=`sudo l2ping -s 1 -c 1 $IDENTIFIER_IPHONE7 >/dev/null 2>&1; echo $?` #Check if iPhone is reachable
-  IsS7EdgeAtHome=`sudo ping -c 1 -W 3 $IDENTIFIER_S7EDGE >/dev/null 2>&1; echo $?` #Check if s7edge is reachable
-  if [ "$IsIphoneAtHome" = 0 ]; then
-    #iPhone7 visible via BT
-    echo "iPhone is visible" | logger
-    writePresenceFile("iphone7")
-  fi
-  if [[ "$IsS7EdgeAtHome" = 0 ]]; then
-    # s7Edge visible via ping
-    echo "edge7 is visible" | logger
-    writePresenceFile("s7edge")
-  fi
-  # else #Phones not visible via BT or Ping
-  #   echo "no is not at home" | logger
-  #   turnOffLightsWhenLeaving
-  # fi
-  showtime
-  sleep 5s # raise to 15 or 30 in production
-done
+# Turn off counter. Give the phones a chance to reconnect if there was just a Problem with bluetooth or network
+TURN_OFF_COUNT=0
+
+function main {
+  while :
+  do
+    IsIphoneAtHome=`sudo l2ping -s 1 -c 1 $IDENTIFIER_IPHONE7 >/dev/null 2>&1; echo $?` #Check if iPhone is reachable
+    IsS7EdgeAtHome=`sudo ping -c 1 -W 3 $IDENTIFIER_S7EDGE >/dev/null 2>&1; echo $?` #Check if s7edge is reachable
+    if [ "$IsIphoneAtHome" = 0 ]; then
+      #iPhone7 visible via BT
+      echo "iPhone is visible" | logger
+      writePresenceFile("iphone7")
+    fi
+    if [[ "$IsS7EdgeAtHome" = 0 ]]; then
+      # s7Edge visible via ping
+      echo "edge7 is visible" | logger
+      writePresenceFile("s7edge")
+    fi
+    # else #Phones not visible via BT or Ping
+    #   echo "no is not at home" | logger
+    #   turnOffLightsWhenLeaving
+    # fi
+    showtime
+    sleep 5s # raise to 15 or 30 in production
+  done
 }
 
 function showtime() {
@@ -73,7 +76,11 @@ function showtime() {
     echo "We don't want to change activated light settings. Otherwise somebody may get mad ;)" | logger
     ;;
     0) echo  "No phones around" | logger
-    kill -SIGKILL $2
+    echo "Grace Time before turn off." | logger
+    if [[ $TURN_OFF_COUNT = 3 ]]; then
+      echo "Turn off lights" | logger
+      turnOffLightsWhenLeaving
+    fi
     ;;
   esac
 
@@ -83,14 +90,13 @@ function showtime() {
 function turnOnLight() {
   if [[ "$1" == "arriving" ]]; then
     #statements
-  $HUEBIN transit 2,10 5 --hue $HUE --bri $BRI --sat $SAT --on # Turn on original Hue Lights (Bulbs, Strips)
-  $HUEBIN transit 5,9 5 --hue $FOHUE --bri $FOBRI --sat $FOSAT --on # Turn on Friends of Hue lights (Iris, Bloom)
+    $HUEBIN transit 2,10 5 --hue $HUE --bri $BRI --sat $SAT --on # Turn on original Hue Lights (Bulbs, Strips)
+    $HUEBIN transit 5,9 5 --hue $FOHUE --bri $FOBRI --sat $FOSAT --on # Turn on Friends of Hue lights (Iris, Bloom)
   fi
 }
 
 function turnOffLightsWhenLeaving {
   # If Phones are leaving, turn off the lights
-  sleep 60 # Maybe the phones are not away? Maybe they reconnect?
   $HUEBIN transit all 5 --off
 }
 
@@ -104,7 +110,7 @@ function turnOffLightsWhenLeaving {
 #   # Turn on lights
 #   turnOnLightWhenArriving
 # fi
-}
+#}
 
 function writePresenceFile() {
   if [[  $0 == 'iphone7' ]]; then
