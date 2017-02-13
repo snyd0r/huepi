@@ -57,11 +57,11 @@ function showtime() {
   # no_phone = 0
 
   if [[ -f $PRESENCEFILE_IPHONE7 ]]; then
-    (($PHONECOUNT+=1))
+    ((PHONECOUNT+=1))
   fi
 
   if [[ -f $PRESENCEFILE_S7EDGE ]]; then
-    (($PHONECOUNT+=2))
+    ((PHONECOUNT+=2))
   fi
 
   case "$PHONECOUNT" in
