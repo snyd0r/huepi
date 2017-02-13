@@ -27,25 +27,29 @@ TURN_OFF_COUNT=0
 function main {
   while :
   do
+    # Check if any of the lights in "Wohnzimmer" are activated.
+    IsThereLight=`hue get 2,3,5,9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
+    if [[ "$IsThereLight" = 0 ]]; then # 0 = There is light, 1 = there is no light
+    # Lights are allready on
+    echo "-!- huepi: Lights are on - doing nothing." | logger
+  else
+    # Turn on lights
     IsIphoneAtHome=`sudo l2ping -s 1 -c 1 $IDENTIFIER_IPHONE7 >/dev/null 2>&1; echo $?` #Check if iPhone is reachable
     IsS7EdgeAtHome=`sudo ping -c 1 -W 3 $IDENTIFIER_S7EDGE >/dev/null 2>&1; echo $?` #Check if s7edge is reachable
     if [ "$IsIphoneAtHome" = 0 ]; then
       #iPhone7 visible via BT
-      echo "huepi: iPhone is visible" | logger
+      echo "-!- huepi: iPhone is visible" | logger
       writePresenceFile "iphone7"
     fi
     if [[ "$IsS7EdgeAtHome" = 0 ]]; then
       # s7Edge visible via ping
-      echo "huepi: edge7 is visible" | logger
+      echo "-!- huepi: edge7 is visible" | logger
       writePresenceFile "s7edge"
     fi
-    # else #Phones not visible via BT or Ping
-    #   echo "huepi: no is not at home" | logger
-    #   turnOffLightsWhenLeaving
-    # fi
     showtime
-    sleep 5s # raise to 15 or 30 in production
-  done
+  fi
+  sleep 5s # raise to 15 or 30 in production
+done
 }
 
 function showtime() {
@@ -65,20 +69,19 @@ function showtime() {
   fi
 
   case "$PHONECOUNT" in
-
-    1)  echo "huepi: iPhone is here." | logger
+    1)  echo "-!- huepi: iPhone is here." | logger
     turnOnLight "arriving"
     ;;
-    2)  echo "huepi: s7edge is here" | logger
+    2)  echo "-!- huepi: s7edge is here" | logger
     turnOnLight "arriving"
     ;;
-    3)  echo "huepi: iPhone and s7edge are here" | logger
-    echo "huepi: We don't want to change activated light settings. Otherwise somebody may get mad ;)" | logger
+    3)  echo "-!- huepi: iPhone and s7edge are here" | logger
+    echo "-!- huepi: We don't want to change activated light settings. Otherwise somebody may get mad ;)" | logger
     ;;
-    0) echo "huepi: No phones around" | logger
-    echo "huepi: Grace Time before turn off." | logger
+    0) echo "-!- huepi: No phones around" | logger
+    echo "-!- huepi: Grace Time before turn off." | logger
     if [[ $TURN_OFF_COUNT = 3 ]]; then
-      echo "huepi: Turn off lights" | logger
+      echo "-!- huepi: Turn off lights" | logger
       turnOffLightsWhenLeaving
     fi
     ((TURN_OFF_COUNT+=1))
@@ -100,18 +103,6 @@ function turnOffLightsWhenLeaving {
   # If Phones are leaving, turn off the lights
   $HUEBIN transit all 5 --off
 }
-
-# function checkIfLightsAreOn {
-#   # Check if any of the lights in "Wohnzimmer" are activated.
-#   IsThereLight=`hue get 2,3,5,9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
-#   if [[ "$IsThereLight" = 0 ]]; then # 0 = There is light, 1 = there is no light
-#   # Lights are allready on
-#   echo "huepi: Lights are on"
-# else
-#   # Turn on lights
-#   turnOnLightWhenArriving
-# fi
-#}
 
 function writePresenceFile() {
   if [[  $1 == "iphone7" ]]; then
