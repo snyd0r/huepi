@@ -69,13 +69,13 @@ function showtime() {
     1)  echo "huepi: iPhone is here." | logger
     turnOnLight "arriving"
     ;;
-    2)  echo  "s7edge is here" | logger
+    2)  echo "huepi: s7edge is here" | logger
     turnOnLight "arriving"
     ;;
-    3)  echo  "iPhone and s7edge are here" | logger
+    3)  echo "huepi: iPhone and s7edge are here" | logger
     echo "huepi: We don't want to change activated light settings. Otherwise somebody may get mad ;)" | logger
     ;;
-    0) echo  "No phones around" | logger
+    0) echo "huepi: No phones around" | logger
     echo "huepi: Grace Time before turn off." | logger
     if [[ $TURN_OFF_COUNT = 3 ]]; then
       echo "huepi: Turn off lights" | logger
