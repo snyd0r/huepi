@@ -49,7 +49,7 @@ function turnOffLightsWhenLeaving {
   $HUEBIN transit 10 5 --off
 }
 
-function checkIfLightsAreOn{
+function checkIfLightsAreOn {
   # Check if any of the lights in "Wohnzimmer" are activated.
   IsThereLight=`hue get 2,3,5,9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
   if [[ "$IsThereLight" = 0 ]]; then # 0 = There is light, 1 = there is no light
@@ -64,6 +64,9 @@ fi
 # function writePresenceFile
 
 # function isSomebodyhere
+
+# TODO Check if it is dark and if lights are needed
+# Maybe with some calculation and sunset- / sundown-times.
 
 # Run this script
 main
