@@ -5,13 +5,15 @@ set -x
 # Hue Executable
 HUEBIN=/usr/bin/hue
 # Hue Settings
-DEVICES="2,10"
+DEVICES="10"
+# DEVICES="2,10"
 HUE="7676"
 BRI="144"
 SAT="199"
 # Friends of Hue Settings (Iris, Bloom)
 # They differ in ColorSettings
-FOH_DEVICES="5,9"
+FOH_DEVICES="9"
+# FOH_DEVICES="5,9"
 FOH_HUE="12057"
 FOH_BRI="144"
 FOH_SAT="143"
@@ -23,7 +25,8 @@ TRANSITTIME=5
 IDENTIFIER_IPHONE7='70:70:0D:98:A6:9C'
 PRESENCEFILE_IPHONE7="/tmp/presence_iphone7"
 # S7-Marker => IP Address (Lease is two Weeks)
-IDENTIFIER_S7EDGE='192.168.77.49'
+IDENTIFIER_S7EDGE='192.168.77.48'
+# IDENTIFIER_S7EDGE='192.168.77.49'
 PRESENCEFILE_S7EDGE="/tmp/presence_s7edge"
 
 # Counters
@@ -36,39 +39,28 @@ NO_AUTO_MODE=0
 function main {
   while :
   do
-    # Check if any of the lights in "Wohnzimmer" are activated.
-    IsThereLight=`hue get 2,3,5,9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
-    # IsThereLight=`hue get 10 | grep -i '"on":true' >/dev/null 2>&1; echo $?` # DEBUG LINE!
-    if [[ "$IsThereLight" = 0 ]]; then # 0 = There is light, 1 = there is no light
-    # Lights are allready on
-    echo "-!- huepi: Lights are on - doing nothing but setting NO_AUTO_MODE counter up by one." | logger
-    ((NO_AUTO_MODE+=1))
-    echo $NO_AUTO_MODE
-  else
-    if [[ NO_AUTO_MODE > 10 ]]; then #TODO find a way to reset the no automode.
-      echo "-!- huepi: Automode has been disabled. Sandra and André are at home."
+
+    # Turn on lights ?
+    IsIphoneAtHome=`sudo l2ping -s 1 -c 1 $IDENTIFIER_IPHONE7 >/dev/null 2>&1; echo $?` #Check if iPhone is reachable
+    IsS7EdgeAtHome=`sudo ping -c 1 -W 3 $IDENTIFIER_S7EDGE >/dev/null 2>&1; echo $?` #Check if s7edge is reachable
+    if [ "$IsIphoneAtHome" = 0 ]; then
+      #iPhone7 visible via BT
+      echo "-!- huepi: iPhone is visible" | logger
+      writePresenceFile "iphone7"
     else
-      # Turn on lights ?
-      IsIphoneAtHome=`sudo l2ping -s 1 -c 1 $IDENTIFIER_IPHONE7 >/dev/null 2>&1; echo $?` #Check if iPhone is reachable
-      IsS7EdgeAtHome=`sudo ping -c 1 -W 3 $IDENTIFIER_S7EDGE >/dev/null 2>&1; echo $?` #Check if s7edge is reachable
-      if [ "$IsIphoneAtHome" = 0 ]; then
-        #iPhone7 visible via BT
-        echo "-!- huepi: iPhone is visible" | logger
-        writePresenceFile "iphone7"
-      else
-        removePresenceFile "iphone7"
-      fi
-      if [[ "$IsS7EdgeAtHome" = 0 ]]; then
-        # s7Edge visible via ping
-        echo "-!- huepi: edge7 is visible" | logger
-        writePresenceFile "s7edge"
-      else
-        removePresenceFile "s7edge"
-      fi
-      showtime
+      removePresenceFile "iphone7"
     fi
-  fi
-  sleep 5s # raise to 15 or 30 in production
+    if [[ "$IsS7EdgeAtHome" = 0 ]]; then
+      # s7Edge visible via ping
+      echo "-!- huepi: edge7 is visible" | logger
+      writePresenceFile "s7edge"
+    else
+      removePresenceFile "s7edge"
+    fi
+    showtime
+
+
+  sleep 1s # raise to 15 or 30 in production
 done
 }
 
@@ -103,9 +95,10 @@ function showtime() {
     0) echo "-!- huepi: No phones around" | logger
     echo "-!- huepi: Grace Time before turn off." | logger
     if [[ $TURN_OFF_COUNT = 3 ]]; then
-      echo "-!- huepi: Turn off lights" | logger
+      echo "-!- huepi: Turn off lights and reset grace counter" | logger
       turnOffLightsWhenLeaving
-      NO_AUTO_MODE=0 # Nobody home, so reset the counter
+      TURN_OFF_COUNT=0
+      # NO_AUTO_MODE=0 # Nobody home, so reset the counter
     fi
     ((TURN_OFF_COUNT+=1))
     ;;
@@ -123,7 +116,7 @@ function turnOnLight() {
 
 function turnOffLightsWhenLeaving {
   # If Phones are leaving, turn off the lights
-  $HUEBIN transit all $TRANSITTIME --off
+  $HUEBIN transit $DEVICES,$FOH_DEVICES $TRANSITTIME --off
 }
 
 function writePresenceFile() {
