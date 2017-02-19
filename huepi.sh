@@ -2,16 +2,21 @@
 set -x
 
 # Variables
-#Hue Executable
+# Hue Executable
 HUEBIN=/usr/bin/hue
 # Hue Settings
+DEVICES="2,10"
 HUE="7676"
 BRI="144"
 SAT="199"
-#Friends of Hue Settings (Iris, Bloom)
-FOHUE="12057"
-FOBRI="144"
-FOSAT="143"
+# Friends of Hue Settings (Iris, Bloom)
+# They differ in ColorSettings
+FOH_DEVICES="5,9"
+FOH_HUE="12057"
+FOH_BRI="144"
+FOH_SAT="143"
+# Transitiontime (Time for lights to come on slowly)
+TRANSITTIME=5
 
 # Section to define how to check presence of the phones
 # iPhonemarker => BluetoothMac
@@ -21,8 +26,12 @@ PRESENCEFILE_IPHONE7="/tmp/presence_iphone7"
 IDENTIFIER_S7EDGE='192.168.77.49'
 PRESENCEFILE_S7EDGE="/tmp/presence_s7edge"
 
-# Turn off counter. Give the phones a chance to reconnect if there was just a Problem with bluetooth or network
+# Counters
+# Turn off counter. Give the phones a chance to reconnect if there was just a Problem with bluetooth or network connection
 TURN_OFF_COUNT=0
+# Counter how long the phones have been seen
+# Otherwise huepi won't know that if i turn the lights off at night, they shall stay off.
+AT_HOME_COUNTER=0
 
 function main {
   while :
@@ -55,6 +64,8 @@ function main {
   sleep 5s # raise to 15 or 30 in production
 done
 }
+
+# Declare used functions
 
 function showtime() {
   # Check for presence Files and determine what to do with the lights
@@ -94,18 +105,17 @@ function showtime() {
 
 }
 
-# Declare used functions
 function turnOnLight() {
   if [[ "$1" == "arriving" ]]; then
     #statements
-    $HUEBIN transit 2,10 5 --hue $HUE --bri $BRI --sat $SAT --on # Turn on original Hue Lights (Bulbs, Strips)
-    $HUEBIN transit 5,9 5 --hue $FOHUE --bri $FOBRI --sat $FOSAT --on # Turn on Friends of Hue lights (Iris, Bloom)
+    $HUEBIN transit $DEVICES $TRANSITTIME --hue $HUE --bri $BRI --sat $SAT --on # Turn on original Hue Lights (Bulbs, Strips)
+    $HUEBIN transit $FOH_DEVICES $TRANSITTIME --hue $FOH_HUE --bri $FOH_BRI --sat $FOH_SAT --on # Turn on Friends of Hue lights (Iris, Bloom)
   fi
 }
 
 function turnOffLightsWhenLeaving {
   # If Phones are leaving, turn off the lights
-  $HUEBIN transit all 5 --off
+  $HUEBIN transit all $TRANSITTIME --off
 }
 
 function writePresenceFile() {
