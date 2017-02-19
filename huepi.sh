@@ -31,35 +31,42 @@ PRESENCEFILE_S7EDGE="/tmp/presence_s7edge"
 TURN_OFF_COUNT=0
 # Counter how long the phones have been seen
 # Otherwise huepi won't know that if i turn the lights off at night, they shall stay off.
-AT_HOME_COUNTER=0
+NO_AUTO_MODE=0
 
 function main {
   while :
   do
     # Check if any of the lights in "Wohnzimmer" are activated.
     IsThereLight=`hue get 2,3,5,9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
+    # IsThereLight=`hue get 10 | grep -i '"on":true' >/dev/null 2>&1; echo $?` # DEBUG LINE!
     if [[ "$IsThereLight" = 0 ]]; then # 0 = There is light, 1 = there is no light
     # Lights are allready on
-    echo "-!- huepi: Lights are on - doing nothing." | logger
+    echo "-!- huepi: Lights are on - doing nothing but setting NO_AUTO_MODE counter up by one." | logger
+    ((NO_AUTO_MODE+=1))
+    echo $NO_AUTO_MODE
   else
-    # Turn on lights
-    IsIphoneAtHome=`sudo l2ping -s 1 -c 1 $IDENTIFIER_IPHONE7 >/dev/null 2>&1; echo $?` #Check if iPhone is reachable
-    IsS7EdgeAtHome=`sudo ping -c 1 -W 3 $IDENTIFIER_S7EDGE >/dev/null 2>&1; echo $?` #Check if s7edge is reachable
-    if [ "$IsIphoneAtHome" = 0 ]; then
-      #iPhone7 visible via BT
-      echo "-!- huepi: iPhone is visible" | logger
-      writePresenceFile "iphone7"
+    if [[ NO_AUTO_MODE > 10 ]]; then #TODO find a way to reset the no automode.
+      echo "-!- huepi: Automode has been disabled. Sandra and André are at home."
     else
-      removePresenceFile "iphone7"
+      # Turn on lights ?
+      IsIphoneAtHome=`sudo l2ping -s 1 -c 1 $IDENTIFIER_IPHONE7 >/dev/null 2>&1; echo $?` #Check if iPhone is reachable
+      IsS7EdgeAtHome=`sudo ping -c 1 -W 3 $IDENTIFIER_S7EDGE >/dev/null 2>&1; echo $?` #Check if s7edge is reachable
+      if [ "$IsIphoneAtHome" = 0 ]; then
+        #iPhone7 visible via BT
+        echo "-!- huepi: iPhone is visible" | logger
+        writePresenceFile "iphone7"
+      else
+        removePresenceFile "iphone7"
+      fi
+      if [[ "$IsS7EdgeAtHome" = 0 ]]; then
+        # s7Edge visible via ping
+        echo "-!- huepi: edge7 is visible" | logger
+        writePresenceFile "s7edge"
+      else
+        removePresenceFile "s7edge"
+      fi
+      showtime
     fi
-    if [[ "$IsS7EdgeAtHome" = 0 ]]; then
-      # s7Edge visible via ping
-      echo "-!- huepi: edge7 is visible" | logger
-      writePresenceFile "s7edge"
-    else
-      removePresenceFile "s7edge"
-    fi
-    showtime
   fi
   sleep 5s # raise to 15 or 30 in production
 done
@@ -98,6 +105,7 @@ function showtime() {
     if [[ $TURN_OFF_COUNT = 3 ]]; then
       echo "-!- huepi: Turn off lights" | logger
       turnOffLightsWhenLeaving
+      NO_AUTO_MODE=0 # Nobody home, so reset the counter
     fi
     ((TURN_OFF_COUNT+=1))
     ;;
