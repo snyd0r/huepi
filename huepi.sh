@@ -1,8 +1,9 @@
 #!/bin/bash
-set -x
+# set -x
 
 # Variables
 PHONES=0
+LIGHTS=0 # 0 = off, 1= on
 # Hue Executable
 HUEBIN=/usr/bin/hue
 # Hue Settings
@@ -32,15 +33,16 @@ PRESENCEFILE_S7EDGE="/tmp/presence_s7edge"
 # Counters
 TURN_OFF_COUNT=0 # After sending the OFF Signal for 3 times it's enough.
 
-
 function main {
   while true
   do
     # Check if any of the lights in "Wohnzimmer" are activated.
-    IsThereLight=`hue get 9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
-    # IsThereLight=`hue get 2,3,5,9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
-    if [[ "$IsThereLight" = 0 ]]; then # 0 = There is light, 1 = there is no light <- && [[ "$AUTO_MODE" = 1 ]]
+    #IsThereLight=`hue get 9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?` <- DEBUG
+    # IsThereLight=`hue get 2,5,9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
+    IsThereLight=`hue get 2,3,5,9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
+    if [[ "$IsThereLight" = 0 ]]; then # 0 = There is light, 1 = there is no light
     # Lights are allready on
+    LIGHTS=1
     echo "-!- huepi: Lights are on - waiting for phones to leave." | logger
     while true ; do
       checkForPhones
@@ -48,7 +50,13 @@ function main {
       sleep 15s # turn this up in production
     done
   else
-    echo "-!- huepi: No lights on. Lets see what to do." | logger
+    echo "-!- huepi: No lights on. Waiting for phones." | logger
+    LIGHTS=0
+    while true ; do
+      checkForPhones
+      [ "$?" -gt 0 ] && break # If return Value = 0 break out of the while loop.
+      sleep 5s # turn this up in production
+    done
   fi
   # Check if phones are connected
   checkForPhones
@@ -98,6 +106,12 @@ function showtime() {
     TURN_OFF_COUNT=0
     ;;
     3)  echo "-!- huepi: iPhone and s7edge are here" | logger
+    # If boths phones arrive at the same time, light would be useful. Especially at night. ;)
+    if [[ "$LIGHTS" -eq 0 ]]; then
+      turnOnLight "arriving"
+      AUTO_MODE=0
+      TURN_OFF_COUNT=0
+    fi
     echo "-!- huepi: We don't want to change activated light settings. Otherwise somebody may get mad ;)" | logger
     AUTO_MODE=0
     ;;
