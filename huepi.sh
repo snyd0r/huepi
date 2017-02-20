@@ -2,6 +2,7 @@
 set -x
 
 # Variables
+PHONES=0
 # Hue Executable
 HUEBIN=/usr/bin/hue
 # Hue Settings
@@ -25,82 +26,85 @@ TRANSITTIME=5
 IDENTIFIER_IPHONE7='70:70:0D:98:A6:9C'
 PRESENCEFILE_IPHONE7="/tmp/presence_iphone7"
 # S7-Marker => IP Address (Lease is two Weeks)
-IDENTIFIER_S7EDGE='192.168.77.48'
-# IDENTIFIER_S7EDGE='192.168.77.49'
+IDENTIFIER_S7EDGE='192.168.77.49'
 PRESENCEFILE_S7EDGE="/tmp/presence_s7edge"
 
 # Counters
-# Turn off counter. Give the phones a chance to reconnect if there was just a Problem with bluetooth or network connection
-TURN_OFF_COUNT=0
-# Counter how long the phones have been seen
-# Otherwise huepi won't know that if i turn the lights off at night, they shall stay off.
-NO_AUTO_MODE=0
+# Enable or disable automatic mode
+AUTO_MODE=1 # 1 = on, 0 = off
 
 function main {
-  while :
+  while true
   do
-
-    # Turn on lights ?
-    IsIphoneAtHome=`sudo l2ping -s 1 -c 1 $IDENTIFIER_IPHONE7 >/dev/null 2>&1; echo $?` #Check if iPhone is reachable
-    IsS7EdgeAtHome=`sudo ping -c 1 -W 3 $IDENTIFIER_S7EDGE >/dev/null 2>&1; echo $?` #Check if s7edge is reachable
-    if [ "$IsIphoneAtHome" = 0 ]; then
-      #iPhone7 visible via BT
-      echo "-!- huepi: iPhone is visible" | logger
-      writePresenceFile "iphone7"
-    else
-      removePresenceFile "iphone7"
-    fi
-    if [[ "$IsS7EdgeAtHome" = 0 ]]; then
-      # s7Edge visible via ping
-      echo "-!- huepi: edge7 is visible" | logger
-      writePresenceFile "s7edge"
-    else
-      removePresenceFile "s7edge"
-    fi
-    showtime
-
-
-  sleep 1s # raise to 15 or 30 in production
+    # Check if any of the lights in "Wohnzimmer" are activated.
+    IsThereLight=`hue get 9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
+    # IsThereLight=`hue get 2,3,5,9,10 | grep -i '"on":true' >/dev/null 2>&1; echo $?`
+    if [[ "$IsThereLight" = 0 ]]; then # 0 = There is light, 1 = there is no light
+    # Lights are allready on
+    echo "-!- huepi: Lights are on - waiting for phones to leave." | logger
+    while true ; do
+      checkForPhones
+      [ "$?" -eq 0 ] && AUTO_MODE=1 && break # If return Value = 0 set to Automatic Mode and break the while.
+      sleep 5s # turn this up in production
+    done
+  else
+    echo "-!- huepi: No lights on. Check what to do."
+    # Something has to happen here - but i can't concentrate O_O
+  fi
+  # Check if phones are connected
+  checkForPhones
+  checkForPhonesResult=$?
+  showtime $checkForPhonesResult
 done
 }
 
 # Declare used functions
 
-function showtime() {
-  # Check for presence Files and determine what to do with the lights
+function checkForPhones() {
   PHONECOUNT=0
-  # We're determining what to do by quickly calculate the Values of the phones
-  # iphone7  = 1
-  # s7edge   = 2
-  # no_phone = 0
-
-  if [[ -f $PRESENCEFILE_IPHONE7 ]]; then
+  # Turn on lights ?
+  IsIphoneAtHome=`sudo l2ping -s 1 -c 1 $IDENTIFIER_IPHONE7 >/dev/null 2>&1; echo $?` #Check if iPhone is reachable
+  IsS7EdgeAtHome=`sudo ping -c 1 -W 3 $IDENTIFIER_S7EDGE >/dev/null 2>&1; echo $?` #Check if s7edge is reachable
+  if [ "$IsIphoneAtHome" = 0 ]; then
+    #iPhone7 visible via BT
+    echo "-!- huepi: iPhone is visible" | logger
+    writePresenceFile "iphone7"
     ((PHONECOUNT+=1))
+  else
+    removePresenceFile "iphone7"
   fi
-
-  if [[ -f $PRESENCEFILE_S7EDGE ]]; then
+  if [[ "$IsS7EdgeAtHome" = 0 ]]; then
+    # s7Edge visible via ping
+    echo "-!- huepi: edge7 is visible" | logger
+    writePresenceFile "s7edge"
     ((PHONECOUNT+=2))
+  else
+    removePresenceFile "s7edge"
   fi
+  return $PHONECOUNT
+}
 
-  case "$PHONECOUNT" in
+function showtime() {
+  # INDEX = PHONECOUNT
+  INDEX=$1
+  case "$INDEX" in
     1)  echo "-!- huepi: iPhone is here." | logger
     turnOnLight "arriving"
+    AUTO_MODE = 0
     ;;
     2)  echo "-!- huepi: s7edge is here" | logger
     turnOnLight "arriving"
+    AUTO_MODE = 0
     ;;
     3)  echo "-!- huepi: iPhone and s7edge are here" | logger
     echo "-!- huepi: We don't want to change activated light settings. Otherwise somebody may get mad ;)" | logger
+    AUTO_MODE = 0
     ;;
     0) echo "-!- huepi: No phones around" | logger
     echo "-!- huepi: Grace Time before turn off." | logger
-    if [[ $TURN_OFF_COUNT = 3 ]]; then
-      echo "-!- huepi: Turn off lights and reset grace counter" | logger
-      turnOffLightsWhenLeaving
-      TURN_OFF_COUNT=0
-      # NO_AUTO_MODE=0 # Nobody home, so reset the counter
-    fi
-    ((TURN_OFF_COUNT+=1))
+    echo "-!- huepi: Turn off lights 'cause nobody is home.'" | logger
+    turnOffLightsWhenLeaving
+    AUTO_MODE = 1
     ;;
   esac
 
@@ -129,9 +133,15 @@ function writePresenceFile() {
 
 function removePresenceFile() {
   if [[  $1 == "iphone7" ]]; then
-    rm $PRESENCEFILE_IPHONE7
+    if [[ -f $PRESENCEFILE_IPHONE7 ]] ; then
+      rm $PRESENCEFILE_IPHONE7
+    fi
+
   elif [[  $1 == "s7edge" ]]; then
-    rm $PRESENCEFILE_S7EDGE
+    if [[ -f $PRESENCEFILE_S7EDGE ]] ; then
+      rm $PRESENCEFILE_S7EDGE
+    fi
+
   fi
 }
 
