@@ -2,7 +2,7 @@
 # set -x
 
 # Variables
-PHONES=0
+# PHONES=0
 LIGHTS=0 # 0 = off, 1= on
 # Hue Executable
 HUEBIN=/usr/bin/hue
@@ -86,8 +86,7 @@ function checkForPhones() {
     ((DEVICECOUNT+=1))
     EC_IPHONE=1
   else
-    EC_IPHONE=9
-    if [[ "$EC_IPHONE" -eq 9 ]]; then
+    if [[ "$EC_IPHONE" -gt 0 ]]; then
       echo "-!- huepi: iPhone has left" | logger
     fi
     removePresenceFile "iphone7"
@@ -102,8 +101,7 @@ function checkForPhones() {
     ((DEVICECOUNT+=2))
     EC_S7EDGE=1
   else
-    EC_S7EDGE=9
-    if [[ "$EC_S7EDGE" -eq 9 ]]; then
+    if [[ "$EC_S7EDGE" -gt 0 ]]; then
       echo "-!- huepi: edge7 has left" | logger
     fi
     removePresenceFile "s7edge"
