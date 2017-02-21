@@ -30,6 +30,11 @@ PRESENCEFILE_IPHONE7="/tmp/presence_iphone7"
 IDENTIFIER_S7EDGE='192.168.77.49'
 PRESENCEFILE_S7EDGE="/tmp/presence_s7edge"
 
+# Echocounter
+# Don't repeat the echoes that iphone or s7edge are there
+EC_IPHONE=0
+EC_S7EDGE=0
+
 # Counters
 TURN_OFF_COUNT=0 # After sending the OFF Signal for 3 times it's enough.
 
@@ -47,7 +52,7 @@ function main {
     while true ; do
       checkForPhones
       [ "$?" -eq 0 ] && break # If return Value = 0 break out of the while loop.
-      sleep 15s # turn this up in production
+      sleep 5s # turn this up in production
     done
   else
     echo "-!- huepi: No lights on. Waiting for phones." | logger
@@ -68,31 +73,47 @@ done
 # Declare used functions
 
 function checkForPhones() {
-  PHONECOUNT=0
+  DEVICECOUNT=0
   # Turn on lights ?
   IsIphoneAtHome=`sudo l2ping -s 1 -c 1 $IDENTIFIER_IPHONE7 >/dev/null 2>&1; echo $?` #Check if iPhone is reachable
   IsS7EdgeAtHome=`sudo ping -c 1 -W 3 $IDENTIFIER_S7EDGE >/dev/null 2>&1; echo $?` #Check if s7edge is reachable
   if [ "$IsIphoneAtHome" = 0 ]; then
     #iPhone7 visible via BT
-    echo "-!- huepi: iPhone is visible" | logger
+    if [[ "$EC_IPHONE" -eq 0 ]]; then
+      echo "-!- huepi: iPhone is visible" | logger
+    fi
     writePresenceFile "iphone7"
-    ((PHONECOUNT+=1))
+    ((DEVICECOUNT+=1))
+    EC_IPHONE=1
   else
+    EC_IPHONE=9
+    if [[ "$EC_IPHONE" -eq 9 ]]; then
+      echo "-!- huepi: iPhone has left" | logger
+    fi
     removePresenceFile "iphone7"
+    EC_IPHONE=0
   fi
   if [[ "$IsS7EdgeAtHome" = 0 ]]; then
     # s7Edge visible via ping
-    echo "-!- huepi: edge7 is visible" | logger
+    if [[ "$EC_S7EDGE" -eq 0 ]]; then
+      echo "-!- huepi: edge7 is visible" | logger
+    fi
     writePresenceFile "s7edge"
-    ((PHONECOUNT+=2))
+    ((DEVICECOUNT+=2))
+    EC_S7EDGE=1
   else
+    EC_S7EDGE=9
+    if [[ "$EC_S7EDGE" -eq 9 ]]; then
+      echo "-!- huepi: edge7 has left" | logger
+    fi
     removePresenceFile "s7edge"
+    EC_S7EDGE=0
   fi
-  return $PHONECOUNT
+  return $DEVICECOUNT
 }
 
 function showtime() {
-  # INDEX = PHONECOUNT
+  # INDEX = DEVICECOUNT
   INDEX=$1
   case "$INDEX" in
     1)  echo "-!- huepi: iPhone is here. Turn the lights on." | logger
